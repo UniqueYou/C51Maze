@@ -1,4 +1,10 @@
 
+/*
+		姓名：王淞
+		学号：11903990330
+		时间：2020-12-5
+		内容：迷宫小车综合课程设计
+*/
 #include <stdio.h>
 #include <reg52.h>
 #include <string.h>
@@ -6,8 +12,6 @@
 #include "mouse.h"
 #include "demo.h"
 #include "algorithm.h"
-
-	
 
 //延时函数
 void delay_ms(unsigned int ms){
@@ -61,6 +65,21 @@ void initTime2()
 		TR2=1;
 }
 
+
+//迷宫数据初始化
+void initMap(unsigned char mapData[SIZE][SIZE])
+{
+	unsigned char i,j;
+	for(i=0;i<SIZE;i++)
+	{
+		for(j=0;j<SIZE;j++)
+		{
+			mapData[i][j] = 0xff;//初始化默认四个方向都有墙		
+		}	
+	}	
+}
+
+
 //T2 中断服务函数
 void time2() interrupt 5
 {
@@ -103,8 +122,8 @@ void time2() interrupt 5
 //小车直行
 void  straightRun()
 {
-		unsigned char i=0,j=0,count=105;
-		for(j=0;j<count;j++)
+		unsigned char i=0,j=0;
+		for(j=0;j<103;j++)
 		{
 			for(i=0;i<8;i++)
 			{
@@ -112,32 +131,31 @@ void  straightRun()
 				delay_ms(2);				
 			}	
 					
-			
-				if(irR&&irL)
-				{
-				/*小车直行途中修正	*/	
+			if(irR&&irL)//只有在左右两面都有墙的情况下修正
+			{
+			/*小车直行途中修正	*/	
 				if(irRU==1 && irC==0)//检测到前方没有障碍并且左边靠墙
 				{		
-						for(i=0;i<8;i++)//小车往右修正
+						for(i=0;i<8;i++)//小车左修正
 						{
 							P1 = (left[i]|0x0f);
-							delay_ms(3);
-						}
-						count+=0.5;
+							delay_ms(2);
+						}			
 				}
 							
 				if(irLU==1 && irC==0)//检测到前方没有障碍并且右边靠墙
 				{
-						for(i=0;i<8;i++)//小车往左修正
+						for(i=0;i<8;i++)//小车往右修正
 						{
 							P1 = (right[i]|0xf0);
-							delay_ms(3);
+							delay_ms(2);
 						}	
-							count+=0.5;
-				}
-				
+				}					
 			}
+			
 		}
+
+		delay_ms(500);
 	
 }
 
@@ -145,7 +163,7 @@ void  straightRun()
 void turnRun()
 {
 	unsigned char i=0,j=0;
-	for(j=0;j<104;j++)
+	for(j=0;j<102;j++)
 	{
 		for(i=0;i<8;i++)
 		{
@@ -161,7 +179,7 @@ void leftRun()
 {
 	
 	unsigned char i=0,j=0;
-	for(j=0;j<52;j++)
+	for(j=0;j<51;j++)
 	{
 		for(i=0;i<8;i++)
 		{
@@ -176,7 +194,7 @@ void leftRun()
 void rightRun()
 {
 	unsigned char i=0,j=0;
-	for(j=0;j<52;j++)
+	for(j=0;j<51;j++)
 	{
 		for(i=0;i<8;i++)
 		{
@@ -197,9 +215,9 @@ void runMaze()
 	while(flag==0 || (poX!=0 || poY!=0))
 	{	
 		//扫描
-		tempC = Scan1();
-		tempR = Scan3();
-		tempL = Scan2();
+		tempC = scanC();
+		tempR = scanR();
+		tempL = scanL();
 		//保存墙的信息
 		saveWalls(tempL,tempR,tempC);
 		runR = !tempR && !isVisit((dir+1)%4);
@@ -213,18 +231,18 @@ void runMaze()
 				push(poX,poY);//岔路口坐标入栈
 			}
 		}
-	  /*右手法则遍历迷宫*/
-		
-		if(runR)  //如果右面没有墙
+	
+		  /*右手法则遍历迷宫*/
+		if(runR)
 		{
 			rightRun(); 
 			straightRun();	
 		}
-		else if(runC) //如果前面没有墙，并且没有走过
+		else if(runC)
 		{				
 			straightRun();										
 		}
-		else if(runL)//如果左面没有墙
+		else if(runL)
 		{	
 			leftRun();
 			straightRun();		
@@ -236,16 +254,14 @@ void runMaze()
 		}
 		resetPos();//更改坐标	
 		saveOneWall((dir+2)%4,poX,poY);//将两个格子间的墙壁打通
-		saveDir(dir,poX,poY);//保存来的方向
-		
+		saveDir(dir,poX,poY);//保存来的方向		
 }
 	
 }
 
 //更改坐标
 void resetPos()
-{
-	
+{	
 	switch(dir)
 	{
 		case 0:poY++;break;//小车向前运动
@@ -258,8 +274,7 @@ void resetPos()
 
 //保存绝对方向到迷宫数据中
 void saveDir(unsigned char i,unsigned char x,unsigned char y)
-{
-	
+{	
 	switch(i)
 	{
 		case 0:map[y][x] =  map[y][x]&0xef;break;
@@ -267,7 +282,6 @@ void saveDir(unsigned char i,unsigned char x,unsigned char y)
 		case 2:map[y][x] =  map[y][x]&0xbf;break;
 		case 3:map[y][x] =  map[y][x]&0x7f;break;
 	}
-
 }
 
 //回溯（回到岔路口的位置）
@@ -290,9 +304,9 @@ void back()
 		//判断是否走到岔路口
 		if(poX==roadX[top] && poY==roadY[top])
 		{
-			 runR = isVisit((dir+1)%4) || Scan3();//判断某个方向是否还能遍历，不能为1
-			 runL = isVisit((dir+3)%4) || Scan2();
-			 runC = isVisit(dir) || Scan1(); 
+			 runR = isVisit((dir+1)%4) || scanR();//判断某个方向是否还能遍历，不能为1
+			 runL = isVisit((dir+3)%4) || scanL();
+			 runC = isVisit(dir) || scanC(); 
 			
 			//如果岔路口所有能走的方向都已经走过了
 			if(runR && runC && runL)
@@ -341,31 +355,21 @@ unsigned char isVisit(unsigned char dir)
 {
 		
 	switch(dir)
-	{
+	{		
+		case 0:	if(poY==SIZE-1)return 1;
+		return map[poY+1][poX]==0xff?0:1;	
 		
-		case 0:
-			if(poY==SIZE-1)
-				return 1;
-			return map[poY+1][poX]==0xff?0:1;
-		case 1:
-			if(poX==SIZE-1)
-				return 1;
-			return map[poY][poX+1]==0xff?0:1;
-		case 2:
-			if(poY==0)
-				return 1;
-			return map[poY-1][poX]==0xff?0:1;
-		case 3:
-				if(poX==0)
-				return 1;
-			return map[poY][poX-1]==0xff?0:1;
+		case 1:if(poX==SIZE-1)return 1;
+		return map[poY][poX+1]==0xff?0:1;		
+		
+		case 2:if(poY==0)return 1;
+		return map[poY-1][poX]==0xff?0:1;	
+		
+		case 3:if(poX==0)return 1;
+		return map[poY][poX-1]==0xff?0:1;					
 	}
 	return 4;
 }
-
-
-
-
 //小车遍历迷宫
 
 //记录没有墙的方向(相对方向)
@@ -395,7 +399,7 @@ void saveWalls(unsigned char left,unsigned char right,unsigned char center)
 
 
 //检测前方有无障碍
-unsigned char Scan1()
+unsigned char scanC()
 {
 	unsigned char i=0;
 	for(;i<30;i++)
@@ -408,7 +412,7 @@ unsigned char Scan1()
 }
 
 //检测左方有无障碍
-unsigned char Scan2()
+unsigned char scanL()
 {
 	unsigned char i=0;
 	for(;i<30;i++)
@@ -421,7 +425,7 @@ unsigned char Scan2()
 }
 
 //检测右方有无障碍
-unsigned char Scan3()
+unsigned char scanR()
 {
 	unsigned char i=0;
 	for(;i<30;i++)
@@ -431,24 +435,6 @@ unsigned char Scan3()
 		delay_ms(3);		
 	}
 	return 0;
-}
-
-/**********************
-           栈
-***********************/
-
-
-//初始化迷宫数据
-void initMap(unsigned char mapData[SIZE][SIZE])
-{
-	unsigned char i,j;
-	for(i=0;i<SIZE;i++)
-	{
-		for(j=0;j<SIZE;j++)
-		{
-			mapData[i][j] = 0xff;//初始化默认四个方向都有墙		
-		}	
-	}	
 }
 
 //路口坐标入栈
@@ -476,25 +462,24 @@ void beepOn()
 	}
 }
 
-//冲刺部分算法
-
-
+/****************
+	冲刺部分算法
+*****************/
 //判断某个方向是否为墙
 unsigned char isWall(unsigned char  dir,unsigned char x,unsigned char y)
 {
 	return (map[y][x]>>dir)&0x01;
 }
 
-
-//广度优先算法
+//广度优先搜索算法
 void bfs()
 {	
-	struct queue queueNum[20];//队列
+	struct queue queueNum[15];//队列
 	unsigned char queueLen = 1;//队列长度
 	struct queue queueHead;//队列头
 	struct queue temp;
 
-	unsigned char i,j;		
+	unsigned char i;		
 	
 	height[0][0] = 0;
 
@@ -510,10 +495,10 @@ void bfs()
 		for(i=0;i<queueLen;i++)
 			queueNum[i] = queueNum[i+1];		
 		//判断四个方向是否能够入队
-		for(j=0;j<4;j++)
+		for(i=0;i<4;i++)
 		{
 			temp=queueHead;
-			switch(j)
+			switch(i)//选择一个方向搜索
 			{
 				case 0:temp.y = queueHead.y+1;break;
 				case 1:temp.x = queueHead.x+1;break;
@@ -521,14 +506,13 @@ void bfs()
 				case 3:temp.x = queueHead.x-1;break;		
 			}	
 									
-			if(temp.x>=SIZE||temp.y>=SIZE||temp.x<0||temp.y<0) 
-				continue;
+			if(temp.x>=SIZE||temp.y>=SIZE||temp.x<0||temp.y<0)continue;//到达迷宫边界停止搜索
+				
 			
-			if(!isWall(j,queueHead.x,queueHead.y) && height[temp.y][temp.x]==0xff)	//如果可以走且第一次走
+			if(!isWall(i,queueHead.x,queueHead.y) && height[temp.y][temp.x]==0xff)	//如果可以走且第一次走
 			{
 				height[temp.y][temp.x] = height[queueHead.y][queueHead.x]+1;
-				queueNum[queueLen] = temp;//坐标入队
-				queueLen++;
+				queueNum[queueLen++] = temp;//坐标入队
 			}
 		}
 	}	
@@ -543,8 +527,6 @@ void findWay()
 	nowPos.y=SIZE-1;
 	nowPos.x=SIZE-1;
 	
-	
-	
 	while(!(nowPos.x==0&&nowPos.y==0))//如果还没有到起点
 	{
 		for(i=0;i<4;i++)
@@ -558,10 +540,8 @@ void findWay()
 				case 3:temp.x = nowPos.x-1;break;		
 			}
 		
-			if(temp.x>=SIZE||temp.y>=SIZE||temp.x<0||temp.y<0) 
-			continue;
-
-			
+			if(temp.x>=SIZE||temp.y>=SIZE||temp.x<0||temp.y<0)continue; //到达迷宫边界停止搜索
+		
 			//如果可以走并且等高表递减
 			if(!isWall(i,nowPos.x,nowPos.y) && (height[temp.y][temp.x]==height[nowPos.y][nowPos.x]-1))
 			{
@@ -576,8 +556,7 @@ void findWay()
 
 //小车按照方向运动
 void runWay()
-{
-		
+{	
 		char carDir = 0;//小车需要走的绝对方向
 		char tempDir = 0;//小车与需要走的方向差的转弯系数
 		dir=0;//绝对方向初始化
@@ -606,8 +585,8 @@ void runWay()
 
 //主函数
 void main()
-{
-	
+{	
+
 	lightInit();//初始化数码管;
 	initTime2();//初始化 T2
 	initMap(map);//初始化迷宫数据
